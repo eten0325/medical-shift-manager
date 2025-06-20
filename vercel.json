@@ -3,9 +3,9 @@
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/node",
+      "use": "@vercel/static-build",
       "config": {
-        "includeFiles": ["build/**"]
+        "distDir": "build"
       }
     }
   ],
@@ -14,6 +14,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "buildCommand": "npm install && chmod +x ./node_modules/.bin/react-scripts && npm run build"
+  ]
 }
