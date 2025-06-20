@@ -16,5 +16,5 @@
     "production": [">0.2%", "not dead"],
     "development": ["last 1 chrome version"]
   },
-  "postinstall": "chmod +x ./node_modules/.bin/react-scripts"
+  "postinstall": "chmod -R +x ./node_modules/.bin"
 }
