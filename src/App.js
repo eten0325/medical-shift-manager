@@ -212,9 +212,9 @@ const FirebaseShiftManager = () => {
     const startDay = firstDay.getDay();
     const days = [];
 
-    for (let i = startDay - 1; i >= 0; i--) {
+    for (let i = 0; i < startDay; i++) {
       days.push({
-        date: new Date(year, month, -i),
+        date: new Date(year, month, i - startDay + 1),
         isCurrentMonth: false
       });
     }
