@@ -1,19 +1,42 @@
-import React, { useState } from 'react';
-import { Calendar, Users, Plus, Save, X, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Users, Plus, Save, X, User, Settings, Trash2 } from 'lucide-react';
+import { db, auth } from './firebase';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  where, 
+  getDocs
+} from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
-const ShiftManager = () => {
+const FirebaseShiftManager = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [shifts, setShifts] = useState([]);
   const [userRole, setUserRole] = useState('staff');
   const [showModal, setShowModal] = useState(false);
   const [showStaffEdit, setShowStaffEdit] = useState(false);
+  const [showHolidayEdit, setShowHolidayEdit] = useState(false);
   const [selectedShift, setSelectedShift] = useState({
     staffId: '1',
     date: '',
     timeType: 'morning',
     notes: ''
   });
-  const [staff, setStaff] = useState([
+  const [staff, setStaff] = useState([]);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentStaffId, setCurrentStaffId] = useState('1');
+  const [customHolidays, setCustomHolidays] = useState({});
+  const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
+
+  // デフォルトスタッフデータ
+  const defaultStaff = [
     { id: '1', name: '田中 花子', color: '#3B82F6' },
     { id: '2', name: '佐藤 太郎', color: '#10B981' },
     { id: '3', name: '山田 美咲', color: '#F59E0B' },
@@ -22,15 +45,10 @@ const ShiftManager = () => {
     { id: '6', name: '渡辺 健太', color: '#EC4899' },
     { id: '7', name: '伊藤 さくら', color: '#06B6D4' },
     { id: '8', name: '中村 雄介', color: '#84CC16' }
-  ]);
+  ];
 
-  const timeTypes = {
-    morning: { label: '午前', start: '08:30', end: '12:30' },
-    afternoon: { label: '午後', start: '13:00', end: '17:30' },
-    fullday: { label: '終日', start: '08:30', end: '17:30' }
-  };
-
-  const holidays = {
+  // デフォルト祝日
+  const defaultHolidays = {
     '2025-01-01': '元日',
     '2025-01-13': '成人の日',
     '2025-02-11': '建国記念の日',
@@ -49,6 +67,105 @@ const ShiftManager = () => {
     '2025-11-23': '勤労感謝の日'
   };
 
+  const allHolidays = { ...defaultHolidays, ...customHolidays };
+
+  const timeTypes = {
+    morning: { label: '午前', start: '08:30', end: '12:30' },
+    afternoon: { label: '午後', start: '13:00', end: '17:30' },
+    fullday: { label: '終日', start: '08:30', end: '17:30' }
+  };
+
+  // Firebase初期化とリアルタイム同期
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // 認証状態の監視
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            setUser(user);
+            setIsLoading(false);
+          } else {
+            // 匿名認証
+            const userCredential = await signInAnonymously(auth);
+            setUser(userCredential.user);
+            setIsLoading(false);
+          }
+        });
+
+        return unsubscribeAuth;
+      } catch (error) {
+        console.error('認証エラー:', error);
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  // スタッフデータの初期化とリアルタイム同期
+  useEffect(() => {
+    if (!user) return;
+
+    // スタッフデータの同期
+    const unsubscribeStaff = onSnapshot(
+      query(collection(db, 'staff'), orderBy('name')),
+      (snapshot) => {
+        if (snapshot.empty) {
+          // 初回データ投入
+          defaultStaff.forEach(async (member) => {
+            await addDoc(collection(db, 'staff'), member);
+          });
+        } else {
+          const staffData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setStaff(staffData);
+        }
+      },
+      (error) => {
+        console.error('スタッフデータ取得エラー:', error);
+      }
+    );
+
+    // シフトデータの同期
+    const unsubscribeShifts = onSnapshot(
+      query(collection(db, 'shifts'), orderBy('date')),
+      (snapshot) => {
+        const shiftsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setShifts(shiftsData);
+      },
+      (error) => {
+        console.error('シフトデータ取得エラー:', error);
+      }
+    );
+
+    // カスタム休日の同期
+    const unsubscribeHolidays = onSnapshot(
+      collection(db, 'customHolidays'),
+      (snapshot) => {
+        const holidaysData = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          holidaysData[data.date] = data.name;
+        });
+        setCustomHolidays(holidaysData);
+      },
+      (error) => {
+        console.error('休日データ取得エラー:', error);
+      }
+    );
+
+    return () => {
+      unsubscribeStaff();
+      unsubscribeShifts();
+      unsubscribeHolidays();
+    };
+  }, [user]);
+
   const getDeadline = (date) => {
     return new Date(date.getFullYear(), date.getMonth() - 1, 26);
   };
@@ -66,8 +183,8 @@ const ShiftManager = () => {
     const dateStr = formatDate(date);
     const dayOfWeek = date.getDay();
     
-    if (holidays[dateStr]) {
-      return { type: 'holiday', name: holidays[dateStr], bgColor: 'bg-red-50', textColor: 'text-red-600' };
+    if (allHolidays[dateStr]) {
+      return { type: 'holiday', name: allHolidays[dateStr], bgColor: 'bg-red-50', textColor: 'text-red-600' };
     } else if (dayOfWeek === 0) {
       return { type: 'sunday', name: '日曜日', bgColor: 'bg-red-50', textColor: 'text-red-600' };
     } else if (dayOfWeek === 6) {
@@ -117,7 +234,82 @@ const ShiftManager = () => {
     return member ? member.color : '#6B7280';
   };
 
-  const handleQuickAdd = (date, timeType) => {
+  // Firebase操作関数
+  const addShiftToFirestore = async (shiftData) => {
+    try {
+      await addDoc(collection(db, 'shifts'), {
+        ...shiftData,
+        userId: user.uid,
+        createdAt: new Date().toISOString()
+      });
+      console.log('シフト追加成功');
+    } catch (error) {
+      console.error('シフト追加エラー:', error);
+      alert('シフト追加に失敗しました');
+    }
+  };
+
+  const removeShiftFromFirestore = async (shiftId) => {
+    try {
+      await deleteDoc(doc(db, 'shifts', shiftId));
+      console.log('シフト削除成功');
+    } catch (error) {
+      console.error('シフト削除エラー:', error);
+      alert('シフト削除に失敗しました');
+    }
+  };
+
+  const updateStaffInFirestore = async (staffId, newName) => {
+    try {
+      await updateDoc(doc(db, 'staff', staffId), { 
+        name: newName,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('スタッフ更新成功');
+    } catch (error) {
+      console.error('スタッフ更新エラー:', error);
+      alert('スタッフ更新に失敗しました');
+    }
+  };
+
+  const addCustomHoliday = async () => {
+    if (!newHoliday.date || !newHoliday.name) {
+      alert('日付と休日名を入力してください');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'customHolidays'), {
+        ...newHoliday,
+        createdAt: new Date().toISOString(),
+        createdBy: user.uid
+      });
+      setNewHoliday({ date: '', name: '' });
+      console.log('カスタム休日追加成功');
+    } catch (error) {
+      console.error('休日追加エラー:', error);
+      alert('休日追加に失敗しました');
+    }
+  };
+
+  const removeCustomHoliday = async (date) => {
+    try {
+      // 該当する休日ドキュメントを検索して削除
+      const q = query(collection(db, 'customHolidays'), where('date', '==', date));
+      const snapshot = await getDocs(q);
+      
+      snapshot.docs.forEach(async (doc) => {
+        await deleteDoc(doc.ref);
+      });
+      
+      console.log('カスタム休日削除成功');
+    } catch (error) {
+      console.error('休日削除エラー:', error);
+      alert('休日削除に失敗しました');
+    }
+  };
+
+  const handleQuickAdd = async (date, timeType) => {
     if (!canSubmit()) {
       alert('希望提出期限が過ぎています');
       return;
@@ -126,41 +318,39 @@ const ShiftManager = () => {
     const dateStr = formatDate(date);
     const existing = shifts.find(s => 
       s.date === dateStr && 
-      s.staffId === selectedShift.staffId && 
+      s.staffId === currentStaffId && 
       s.timeType === timeType
     );
 
     if (existing) {
-      setShifts(shifts.filter(s => s.id !== existing.id));
+      await removeShiftFromFirestore(existing.id);
     } else {
       const newShift = {
-        id: Date.now(),
-        staffId: selectedShift.staffId,
+        staffId: currentStaffId,
         date: dateStr,
         timeType: timeType,
         notes: `${timeTypes[timeType].label}勤務`,
         status: 'requested'
       };
-      setShifts([...shifts, newShift]);
+      await addShiftToFirestore(newShift);
     }
   };
 
-  const handleDetailAdd = () => {
+  const handleDetailAdd = async () => {
     if (!selectedShift.date) {
       alert('日付を選択してください');
       return;
     }
 
     const newShift = {
-      id: Date.now(),
       ...selectedShift,
       status: 'requested'
     };
     
-    setShifts([...shifts, newShift]);
+    await addShiftToFirestore(newShift);
     setShowModal(false);
     setSelectedShift({
-      staffId: '1',
+      staffId: currentStaffId,
       date: '',
       timeType: 'morning',
       notes: ''
@@ -175,6 +365,14 @@ const ShiftManager = () => {
     ));
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Firebase接続中...</div>
+      </div>
+    );
+  }
+
   const days = getCalendarDays();
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -185,7 +383,7 @@ const ShiftManager = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <Calendar className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-800">受付シフト管理</h1>
+            <h1 className="text-2xl font-bold text-gray-800">受付シフト管理（Firebase連携版）</h1>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -200,6 +398,24 @@ const ShiftManager = () => {
                 <option value="admin">管理者</option>
               </select>
             </div>
+
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setShowHolidayEdit(true)}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span>休日管理</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 接続状態表示 */}
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center text-green-800">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+            <span className="text-sm">🔥 Firebase リアルタイム接続中 - 全員でデータ共有</span>
           </div>
         </div>
 
@@ -209,10 +425,10 @@ const ShiftManager = () => {
           }`}>
             <div className="flex items-center space-x-4">
               <div>
-                <label className="text-sm text-blue-700 mr-2">スタッフ:</label>
+                <label className="text-sm text-blue-700 mr-2">あなたのスタッフ名:</label>
                 <select
-                  value={selectedShift.staffId}
-                  onChange={(e) => setSelectedShift({...selectedShift, staffId: e.target.value})}
+                  value={currentStaffId}
+                  onChange={(e) => setCurrentStaffId(e.target.value)}
                   className="px-2 py-1 border rounded text-sm"
                 >
                   {staff.map(member => (
@@ -226,10 +442,10 @@ const ShiftManager = () => {
             
             <div className="mt-3 p-3 bg-white rounded border">
               <p className="text-sm text-blue-800">
-                <strong>選択中:</strong> {getStaffName(selectedShift.staffId)}
+                <strong>選択中:</strong> {getStaffName(currentStaffId)}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                💡 カレンダーの午前・午後エリアをクリックして希望を追加/削除
+                💡 カレンダーの午前・午後エリアをクリックして希望を追加/削除（リアルタイム反映）
               </p>
             </div>
           </div>
@@ -288,7 +504,7 @@ const ShiftManager = () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-medium flex items-center">
               <Users className="w-5 h-5 mr-2" />
-              受付スタッフ
+              受付スタッフ（リアルタイム同期）
             </h3>
             {userRole === 'admin' && (
               <button
@@ -310,13 +526,9 @@ const ShiftManager = () => {
                   <input
                     type="text"
                     value={member.name}
-                    onChange={(e) => {
-                      const newStaff = staff.map(s => 
-                        s.id === member.id ? { ...s, name: e.target.value } : s
-                      );
-                      setStaff(newStaff);
-                    }}
+                    onChange={(e) => updateStaffInFirestore(member.id, e.target.value)}
                     className="text-sm font-medium px-2 py-1 border rounded"
+                    onBlur={(e) => updateStaffInFirestore(member.id, e.target.value)}
                   />
                 ) : (
                   <span className="text-sm font-medium">{member.name}</span>
@@ -344,7 +556,9 @@ const ShiftManager = () => {
                   <div className="flex items-center justify-between">
                     <span>{day.date.getDate()}</span>
                     {day.isCurrentMonth && dateInfo.type === 'holiday' && (
-                      <span className="text-xs bg-red-600 text-white px-1 rounded">祝</span>
+                      <span className="text-xs bg-red-600 text-white px-1 rounded">
+                        {customHolidays[formatDate(day.date)] ? 'カ' : '祝'}
+                      </span>
                     )}
                   </div>
                   {day.isCurrentMonth && dateInfo.type === 'holiday' && (
@@ -420,13 +634,14 @@ const ShiftManager = () => {
           })}
         </div>
 
-        {showModal && (
+        {/* 休日管理モーダル */}
+        {showHolidayEdit && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-96">
+            <div className="bg-white p-6 rounded-lg w-96 max-h-96 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium">希望提出</h3>
+                <h3 className="text-lg font-medium">休日管理</h3>
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={() => setShowHolidayEdit(false)}
                   className="p-1 hover:bg-gray-100 rounded"
                 >
                   <X className="w-5 h-5" />
@@ -435,69 +650,138 @@ const ShiftManager = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">スタッフ</label>
-                  <select
-                    value={selectedShift.staffId}
-                    onChange={(e) => setSelectedShift({...selectedShift, staffId: e.target.value})}
-                    className="w-full p-2 border rounded-lg"
-                  >
-                    {staff.map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
+                  <h4 className="font-medium mb-2">カスタム休日追加</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="date"
+                      value={newHoliday.date}
+                      onChange={(e) => setNewHoliday({...newHoliday, date: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                    <input
+                      type="text"
+                      placeholder="休日名（例：病院創立記念日）"
+                      value={newHoliday.name}
+                      onChange={(e) => setNewHoliday({...newHoliday, name: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                    <button
+                      onClick={addCustomHoliday}
+                      className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700"
+                    >
+                      追加
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">設定済みカスタム休日</h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {Object.entries(customHolidays).map(([date, name]) => (
+                      <div key={date} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div>
+                          <div className="text-sm font-medium">{name}</div>
+                          <div className="text-xs text-gray-500">{date}</div>
+                        </div>
+                        <button
+                          onClick={() => removeCustomHoliday(date)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
-                  </select>
+                    {Object.keys(customHolidays).length === 0 && (
+                      <div className="text-sm text-gray-500 text-center py-4">
+                        カスタム休日はありません
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">日付</label>
-                  <input
-                    type="date"
-                    value={selectedShift.date}
-                    onChange={(e) => setSelectedShift({...selectedShift, date: e.target.value})}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">時間帯</label>
-                  <select
-                    value={selectedShift.timeType}
-                    onChange={(e) => setSelectedShift({...selectedShift, timeType: e.target.value})}
-                    className="w-full p-2 border rounded-lg"
-                  >
-                    {Object.entries(timeTypes).map(([key, type]) => (
-                      <option key={key} value={key}>
-                        {type.label} ({type.start}-{type.end})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">備考</label>
-                  <textarea
-                    value={selectedShift.notes}
-                    onChange={(e) => setSelectedShift({...selectedShift, notes: e.target.value})}
-                    className="w-full p-2 border rounded-lg"
-                    rows="2"
-                    placeholder="特記事項があれば入力してください"
-                  />
-                </div>
-
-                <button
-                  onClick={handleDetailAdd}
-                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  保存
-                </button>
               </div>
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
+
+{/* 詳細入力モーダル */}
+{showModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+           <div className="bg-white p-6 rounded-lg w-96">
+             <div className="flex items-center justify-between mb-4">
+               <h3 className="text-lg font-medium">希望提出</h3>
+               <button
+                 onClick={() => setShowModal(false)}
+                 className="p-1 hover:bg-gray-100 rounded"
+               >
+                 <X className="w-5 h-5" />
+               </button>
+             </div>
+
+             <div className="space-y-4">
+               <div>
+                 <label className="block text-sm font-medium mb-1">スタッフ</label>
+                 <select
+                   value={selectedShift.staffId}
+                   onChange={(e) => setSelectedShift({...selectedShift, staffId: e.target.value})}
+                   className="w-full p-2 border rounded-lg"
+                 >
+                   {staff.map(member => (
+                     <option key={member.id} value={member.id}>
+                       {member.name}
+                     </option>
+                   ))}
+                 </select>
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium mb-1">日付</label>
+                 <input
+                   type="date"
+                   value={selectedShift.date}
+                   onChange={(e) => setSelectedShift({...selectedShift, date: e.target.value})}
+                   className="w-full p-2 border rounded-lg"
+                 />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium mb-1">時間帯</label>
+                 <select
+                   value={selectedShift.timeType}
+                   onChange={(e) => setSelectedShift({...selectedShift, timeType: e.target.value})}
+                   className="w-full p-2 border rounded-lg"
+                 >
+                   {Object.entries(timeTypes).map(([key, type]) => (
+                     <option key={key} value={key}>
+                       {type.label} ({type.start}-{type.end})
+                     </option>
+                   ))}
+                 </select>
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium mb-1">備考</label>
+                 <textarea
+                   value={selectedShift.notes}
+                   onChange={(e) => setSelectedShift({...selectedShift, notes: e.target.value})}
+                   className="w-full p-2 border rounded-lg"
+                   rows="2"
+                   placeholder="特記事項があれば入力してください"
+                 />
+               </div>
+
+               <button
+                 onClick={handleDetailAdd}
+                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+               >
+                 保存（リアルタイム反映）
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   </div>
+ );
 };
 
-export default ShiftManager;
+export default FirebaseShiftManager;
