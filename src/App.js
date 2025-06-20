@@ -37,14 +37,14 @@ const FirebaseShiftManager = () => {
 
   // デフォルトスタッフデータ
   const defaultStaff = [
-    { id: '1', name: '田中 花子', color: '#3B82F6' },
-    { id: '2', name: '佐藤 太郎', color: '#10B981' },
-    { id: '3', name: '山田 美咲', color: '#F59E0B' },
-    { id: '4', name: '鈴木 一郎', color: '#EF4444' },
-    { id: '5', name: '高橋 美由紀', color: '#8B5CF6' },
-    { id: '6', name: '渡辺 健太', color: '#EC4899' },
-    { id: '7', name: '伊藤 さくら', color: '#06B6D4' },
-    { id: '8', name: '中村 雄介', color: '#84CC16' }
+    { id: '1', name: '半田 泉', color: '#3B82F6' },
+    { id: '2', name: '新島 美由莉', color: '#10B981' },
+    { id: '3', name: '戸澤 悠子', color: '#F59E0B' },
+    { id: '4', name: '菊地 舞美', color: '#EF4444' },
+    { id: '5', name: '尾形 彩夏', color: '#8B5CF6' },
+    { id: '6', name: '丸尾 美々', color: '#EC4899' },
+    { id: '7', name: '村上 悠樹', color: '#06B6D4' },
+    { id: '8', name: '高島 美樹', color: '#84CC16' }
   ];
 
   // デフォルト祝日
@@ -504,7 +504,7 @@ const FirebaseShiftManager = () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-medium flex items-center">
               <Users className="w-5 h-5 mr-2" />
-              受付スタッフ（リアルタイム同期）
+              スタッフ
             </h3>
             {userRole === 'admin' && (
               <button
