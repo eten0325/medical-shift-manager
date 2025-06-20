@@ -209,14 +209,18 @@ const FirebaseShiftManager = () => {
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startDay = firstDay.getDay();
+    const startDay = firstDay.getDay(); // 0:日曜, 1:月曜, ...
     const days = [];
 
-    for (let i = 0; i < startDay; i++) {
-      days.push({
-        date: new Date(year, month, i - startDay + 1),
-        isCurrentMonth: false
-      });
+    // 前月分の日付を正確に埋める
+    if (startDay !== 0) {
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+      for (let i = startDay - 1; i >= 0; i--) {
+        days.push({
+          date: new Date(year, month - 1, prevMonthLastDay - i),
+          isCurrentMonth: false
+        });
+      }
     }
 
     for (let day = 1; day <= lastDay.getDate(); day++) {
@@ -393,7 +397,7 @@ const FirebaseShiftManager = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <Calendar className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-800">受付シフト管理（Firebase連携版）</h1>
+            <h1 className="text-2xl font-bold text-gray-800">シフト管理</h1>
           </div>
           
           <div className="flex items-center space-x-4">
