@@ -34,6 +34,7 @@ const FirebaseShiftManager = () => {
   const [currentStaffId, setCurrentStaffId] = useState('1');
   const [customHolidays, setCustomHolidays] = useState({});
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
+  const [editedStaffNames, setEditedStaffNames] = useState({});
 
   // デフォルトスタッフデータ
   const defaultStaff = [
@@ -165,6 +166,15 @@ const FirebaseShiftManager = () => {
       unsubscribeHolidays();
     };
   }, [user]);
+
+  useEffect(() => {
+    // スタッフデータが更新されたら、編集用stateも同期
+    const names = {};
+    staff.forEach(member => {
+      names[member.id] = member.name;
+    });
+    setEditedStaffNames(names);
+  }, [staff]);
 
   const getDeadline = (date) => {
     return new Date(date.getFullYear(), date.getMonth() - 1, 26);
@@ -525,10 +535,14 @@ const FirebaseShiftManager = () => {
                 {showStaffEdit && userRole === 'admin' ? (
                   <input
                     type="text"
-                    value={member.name}
-                    onChange={(e) => updateStaffInFirestore(member.id, e.target.value)}
+                    value={editedStaffNames[member.id] || ''}
+                    onChange={(e) => setEditedStaffNames({ ...editedStaffNames, [member.id]: e.target.value })}
                     className="text-sm font-medium px-2 py-1 border rounded"
-                    onBlur={(e) => updateStaffInFirestore(member.id, e.target.value)}
+                    onBlur={(e) => {
+                      if (member.name !== editedStaffNames[member.id]) {
+                        updateStaffInFirestore(member.id, editedStaffNames[member.id]);
+                      }
+                    }}
                   />
                 ) : (
                   <span className="text-sm font-medium">{member.name}</span>
