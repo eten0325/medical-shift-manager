@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "chmod +x ./node_modules/.bin/* && react-scripts build"
+    "build": "chmod +x ./node_modules/.bin/react-scripts && chmod +x ./node_modules/.bin/* && react-scripts build"
   },
   "browserslist": {
     "production": [">0.2%", "not dead"],
