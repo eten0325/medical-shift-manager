@@ -9,7 +9,7 @@
     },
     "scripts": {
       "start": "npx react-scripts start",
-      "build": "npxreact-scripts build"
+      "build": "npx react-scripts build"
     },
     "devDependencies": {
       "react-scripts": "5.0.1"
