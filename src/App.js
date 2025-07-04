@@ -344,12 +344,10 @@ const FirebaseShiftManager = () => {
         restoredAt: new Date().toISOString(),
         restoredBy: user.uid
       });
-      // 新しいIDでdeletedShiftsの該当データを更新
+      // 新しいIDでdeletedShiftsの該当データを更新（削除はしない）
       setDeletedShifts(prev => prev.map(shift =>
         shift.id === deletedShift.id ? { ...shift, id: docRef.id } : shift
       ));
-      // 削除履歴から削除
-      setDeletedShifts(prev => prev.filter(shift => shift.id !== docRef.id));
       console.log('シフト復元成功');
     } catch (error) {
       console.error('シフト復元エラー:', error);
