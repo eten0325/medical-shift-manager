@@ -678,7 +678,7 @@ const FirebaseShiftManager = () => {
                         }}
                       >
                         <div className="font-medium">{getStaffName(shift.staffId)}</div>
-                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId)) && (
+                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId && canSubmit())) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -723,7 +723,7 @@ const FirebaseShiftManager = () => {
                         }}
                       >
                         <div className="font-medium">{getStaffName(shift.staffId)}</div>
-                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId)) && (
+                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId && canSubmit())) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
