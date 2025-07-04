@@ -466,12 +466,7 @@ const FirebaseShiftManager = () => {
               <p className="text-sm text-blue-800">
                 <strong>選択中:</strong> {getStaffName(currentStaffId)}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
-                💡 カレンダーの午前・午後エリアをクリックして希望を追加/削除（リアルタイム反映）
-                {userRole === 'admin' && !canSubmit() && (
-                  <span className="text-green-600 font-medium"> - 管理者権限により期限後も操作可能</span>
-                )}
-              </p>
+
             </div>
           </div>
         )}
