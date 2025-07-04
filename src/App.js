@@ -328,7 +328,8 @@ const FirebaseShiftManager = () => {
   };
 
   const handleQuickAdd = async (date, timeType) => {
-    if (!canSubmit()) {
+    // 管理者の場合は期限チェックをスキップ
+    if (userRole === 'staff' && !canSubmit()) {
       alert('希望提出期限が過ぎています');
       return;
     }
@@ -357,6 +358,12 @@ const FirebaseShiftManager = () => {
   const handleDetailAdd = async () => {
     if (!selectedShift.date) {
       alert('日付を選択してください');
+      return;
+    }
+
+    // 管理者の場合は期限チェックをスキップ
+    if (userRole === 'staff' && !canSubmit()) {
+      alert('希望提出期限が過ぎています');
       return;
     }
 
@@ -437,13 +444,16 @@ const FirebaseShiftManager = () => {
           </div>
         </div>
 
-        {userRole === 'staff' && (
+        {(userRole === 'staff' || userRole === 'admin') && (
           <div className={`p-4 rounded-lg border mb-6 ${
+            userRole === 'admin' ? 'bg-green-50 border-green-200' : 
             canSubmit() ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
           }`}>
             <div className="flex items-center space-x-4">
               <div>
-                <label className="text-sm text-blue-700 mr-2">あなたのスタッフ名:</label>
+                <label className="text-sm text-blue-700 mr-2">
+                  {userRole === 'admin' ? '操作対象スタッフ:' : 'あなたのスタッフ名:'}
+                </label>
                 <select
                   value={currentStaffId}
                   onChange={(e) => setCurrentStaffId(e.target.value)}
@@ -464,6 +474,9 @@ const FirebaseShiftManager = () => {
               </p>
               <p className="text-xs text-blue-600 mt-1">
                 💡 カレンダーの午前・午後エリアをクリックして希望を追加/削除（リアルタイム反映）
+                {userRole === 'admin' && !canSubmit() && (
+                  <span className="text-green-600 font-medium"> - 管理者権限により期限後も操作可能</span>
+                )}
               </p>
             </div>
           </div>
@@ -477,6 +490,11 @@ const FirebaseShiftManager = () => {
           {!canSubmit() && userRole === 'staff' && (
             <p className="text-sm text-red-600 mt-1">
               ※ 期限を過ぎているため、希望の提出・変更はできません
+            </p>
+          )}
+          {!canSubmit() && userRole === 'admin' && (
+            <p className="text-sm text-green-600 mt-1">
+              ✅ 管理者権限により、期限を過ぎてもシフトの追加・変更が可能です
             </p>
           )}
         </div>
@@ -592,12 +610,12 @@ const FirebaseShiftManager = () => {
                 
                 <div 
                   className={`min-h-12 p-1 border-b border-gray-200 ${
-                    day.isCurrentMonth && canSubmit() && userRole === 'staff'
+                    day.isCurrentMonth && (userRole === 'admin' || (canSubmit() && userRole === 'staff'))
                       ? 'cursor-pointer hover:bg-blue-100'
                       : ''
                   }`}
                   onClick={() => {
-                    if (day.isCurrentMonth && canSubmit() && userRole === 'staff') {
+                    if (day.isCurrentMonth && (userRole === 'admin' || (canSubmit() && userRole === 'staff'))) {
                       handleQuickAdd(day.date, 'morning');
                     }
                   }}
@@ -623,12 +641,12 @@ const FirebaseShiftManager = () => {
 
                 <div 
                   className={`min-h-12 p-1 ${
-                    day.isCurrentMonth && canSubmit() && userRole === 'staff'
+                    day.isCurrentMonth && (userRole === 'admin' || (canSubmit() && userRole === 'staff'))
                       ? 'cursor-pointer hover:bg-blue-100'
                       : ''
                   }`}
                   onClick={() => {
-                    if (day.isCurrentMonth && canSubmit() && userRole === 'staff') {
+                    if (day.isCurrentMonth && (userRole === 'admin' || (canSubmit() && userRole === 'staff'))) {
                       handleQuickAdd(day.date, 'afternoon');
                     }
                   }}
