@@ -338,14 +338,17 @@ const FirebaseShiftManager = () => {
       }
       // 削除されたシフトを復元
       const { deletedAt, deletedBy, ...shiftData } = deletedShift;
-      await addDoc(collection(db, 'shifts'), {
+      const docRef = await addDoc(collection(db, 'shifts'), {
         ...shiftData,
         restoredAt: new Date().toISOString(),
         restoredBy: user.uid
       });
-      
+      // 新しいIDでdeletedShiftsの該当データを更新
+      setDeletedShifts(prev => prev.map(shift =>
+        shift.id === deletedShift.id ? { ...shift, id: docRef.id } : shift
+      ));
       // 削除履歴から削除
-      setDeletedShifts(prev => prev.filter(shift => shift.id !== deletedShift.id));
+      setDeletedShifts(prev => prev.filter(shift => shift.id !== docRef.id));
       console.log('シフト復元成功');
     } catch (error) {
       console.error('シフト復元エラー:', error);
