@@ -274,14 +274,15 @@ const FirebaseShiftManager = () => {
       // 削除前にシフトデータを取得
       const shiftToDelete = shifts.find(shift => shift.id === shiftId);
       if (shiftToDelete) {
-        // 削除されたシフトを履歴に保存
-        setDeletedShifts(prev => [...prev, {
-          ...shiftToDelete,
-          deletedAt: new Date().toISOString(),
-          deletedBy: user.uid
-        }]);
+        setDeletedShifts(prev => [
+          ...prev.filter(s => s.id !== shiftToDelete.id),
+          {
+            ...shiftToDelete,
+            deletedAt: new Date().toISOString(),
+            deletedBy: user.uid
+          }
+        ]);
       }
-      
       await deleteDoc(doc(db, 'shifts', shiftId));
       console.log('シフト削除成功');
     } catch (error) {
