@@ -35,6 +35,8 @@ const FirebaseShiftManager = () => {
   const [customHolidays, setCustomHolidays] = useState({});
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
   const [editedStaffNames, setEditedStaffNames] = useState({});
+  const [deletedShifts, setDeletedShifts] = useState([]);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
 
   // デフォルトスタッフデータ
   const defaultStaff = [
@@ -269,6 +271,17 @@ const FirebaseShiftManager = () => {
 
   const removeShiftFromFirestore = async (shiftId) => {
     try {
+      // 削除前にシフトデータを取得
+      const shiftToDelete = shifts.find(shift => shift.id === shiftId);
+      if (shiftToDelete) {
+        // 削除されたシフトを履歴に保存
+        setDeletedShifts(prev => [...prev, {
+          ...shiftToDelete,
+          deletedAt: new Date().toISOString(),
+          deletedBy: user.uid
+        }]);
+      }
+      
       await deleteDoc(doc(db, 'shifts', shiftId));
       console.log('シフト削除成功');
     } catch (error) {
@@ -307,6 +320,25 @@ const FirebaseShiftManager = () => {
     } catch (error) {
       console.error('休日追加エラー:', error);
       alert('休日追加に失敗しました');
+    }
+  };
+
+  const restoreShift = async (deletedShift) => {
+    try {
+      // 削除されたシフトを復元
+      const { deletedAt, deletedBy, ...shiftData } = deletedShift;
+      await addDoc(collection(db, 'shifts'), {
+        ...shiftData,
+        restoredAt: new Date().toISOString(),
+        restoredBy: user.uid
+      });
+      
+      // 削除履歴から削除
+      setDeletedShifts(prev => prev.filter(shift => shift.id !== deletedShift.id));
+      console.log('シフト復元成功');
+    } catch (error) {
+      console.error('シフト復元エラー:', error);
+      alert('シフト復元に失敗しました');
     }
   };
 
@@ -425,13 +457,22 @@ const FirebaseShiftManager = () => {
             </div>
 
             {userRole === 'admin' && (
-              <button
-                onClick={() => setShowHolidayEdit(true)}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                <span>休日管理</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowHolidayEdit(true)}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>休日管理</span>
+                </button>
+                <button
+                  onClick={() => setShowRestoreModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>削除履歴 ({deletedShifts.length})</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -616,13 +657,27 @@ const FirebaseShiftManager = () => {
                       .map(shift => (
                       <div 
                         key={shift.id}
-                        className="text-xs p-1 rounded border-2"
+                        className="text-xs p-1 rounded border-2 relative group"
                         style={{ 
                           backgroundColor: 'white',
                           borderColor: getStaffColor(shift.staffId)
                         }}
                       >
                         <div className="font-medium">{getStaffName(shift.staffId)}</div>
+                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId)) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('このシフトを削除しますか？')) {
+                                removeShiftFromFirestore(shift.id);
+                              }
+                            }}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                            title="削除"
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -647,13 +702,27 @@ const FirebaseShiftManager = () => {
                       .map(shift => (
                       <div 
                         key={shift.id}
-                        className="text-xs p-1 rounded border-2"
+                        className="text-xs p-1 rounded border-2 relative group"
                         style={{ 
                           backgroundColor: 'white',
                           borderColor: getStaffColor(shift.staffId)
                         }}
                       >
                         <div className="font-medium">{getStaffName(shift.staffId)}</div>
+                        {(userRole === 'admin' || (userRole === 'staff' && shift.staffId === currentStaffId)) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('このシフトを削除しますか？')) {
+                                removeShiftFromFirestore(shift.id);
+                              }
+                            }}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                            title="削除"
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -727,6 +796,53 @@ const FirebaseShiftManager = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 削除履歴復元モーダル */}
+        {showRestoreModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg w-96 max-h-96 overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium">削除履歴</h3>
+                <button
+                  onClick={() => setShowRestoreModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {deletedShifts.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    削除されたシフトはありません
+                  </div>
+                ) : (
+                  deletedShifts.map((deletedShift) => (
+                    <div key={deletedShift.id} className="p-3 border rounded-lg bg-gray-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium text-sm">
+                          {getStaffName(deletedShift.staffId)} - {deletedShift.date}
+                        </div>
+                        <button
+                          onClick={() => restoreShift(deletedShift)}
+                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                        >
+                          復元
+                        </button>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {timeTypes[deletedShift.timeType]?.label} - {deletedShift.notes}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        削除日時: {new Date(deletedShift.deletedAt).toLocaleString('ja-JP')}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
