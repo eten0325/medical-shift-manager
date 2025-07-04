@@ -325,6 +325,17 @@ const FirebaseShiftManager = () => {
 
   const restoreShift = async (deletedShift) => {
     try {
+      // すでに同じ日・スタッフ・時間帯のシフトが存在するかチェック
+      const exists = shifts.some(
+        s =>
+          s.date === deletedShift.date &&
+          s.staffId === deletedShift.staffId &&
+          s.timeType === deletedShift.timeType
+      );
+      if (exists) {
+        alert('同じスタッフ・日付・時間帯のシフトが既に存在します。復元できません。');
+        return;
+      }
       // 削除されたシフトを復元
       const { deletedAt, deletedBy, ...shiftData } = deletedShift;
       await addDoc(collection(db, 'shifts'), {
