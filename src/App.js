@@ -436,13 +436,7 @@ const FirebaseShiftManager = () => {
           </div>
         </div>
 
-        {/* 接続状態表示 */}
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center text-green-800">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            <span className="text-sm">🔥 Firebase リアルタイム接続中 - 全員でデータ共有</span>
-          </div>
-        </div>
+
 
         {(userRole === 'staff' || userRole === 'admin') && (
           <div className={`p-4 rounded-lg border mb-6 ${
