@@ -177,7 +177,7 @@ const FirebaseShiftManager = () => {
   }, [staff]);
 
   const getDeadline = (date) => {
-    return new Date(date.getFullYear(), date.getMonth() - 1, 26);
+    return new Date(date.getFullYear(), date.getMonth() - 1, 20);
   };
 
   const canSubmit = () => {
